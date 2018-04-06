@@ -62,10 +62,10 @@ String promResponse() {
   String promPage ="kraken_temperature_celsius{sensor=\"BME280\"} " + String(airTemperature) + "\n" ;
   promPage += "kraken_airpressure_hectopascals{sensor=\"BME280\"} " + String(airPres) + "\n";
   promPage += "kraken_relative_humidity_percent{sensor=\"BME280\"} " + String(airHumidity) + "\n";
-  //promPage += "kraken_rzero{sensor=\"MQ135\"} " + String(rzero) + "\n";
-  //promPage += "kraken_raw{sensor=\"MQ135\"} " + String(sensorValue) + "\n";
-  //promPage += "kraken_voc_ppm{sensor=\"MQ135\"} " + String(ppm) + "\n";
-  //promPage += "kraken_voc_ppm_balanced{sensor=\"MQ135\"} " + String(ppmbalanced) + "\n";
+  promPage += "kraken_rzero{sensor=\"MQ135\"} " + String(rzero) + "\n";
+  promPage += "kraken_raw{sensor=\"MQ135\"} " + String(sensorValue) + "\n";
+  promPage += "kraken_voc_ppm{sensor=\"MQ135\"} " + String(ppm) + "\n";
+  promPage += "kraken_voc_ppm_balanced{sensor=\"MQ135\"} " + String(ppmbalanced) + "\n";
   return promPage;
 }
 
@@ -113,10 +113,10 @@ void setup(void){
     bme.read(airPres, airTemperature, airHumidity);
 
     // MQ 135 Abfrage
-    //    sensorValue = analogRead(SENSORPIN);
-    //    rzero = gasSensor.getRZero();
-    //   ppm = gasSensor.getPPM();
-    //    ppmbalanced = gasSensor.getCorrectedPPM(airTemperature, airHumidity);
+    sensorValue = analogRead(SENSORPIN);
+    rzero = gasSensor.getRZero();
+    ppm = gasSensor.getPPM();
+    ppmbalanced = gasSensor.getCorrectedPPM(airTemperature, airHumidity);
 
     server.send(200, "text/plain", promResponse());
   });
