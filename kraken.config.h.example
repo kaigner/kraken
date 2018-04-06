@@ -1,0 +1,2 @@
+#define wlan_ssid  "SSID";
+#define wlan_pass  "PASS";
