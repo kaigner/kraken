@@ -21,13 +21,21 @@
 // Angeschlossene Sensoren (geht noch nicht)
 boolean s_BME280 = true;
 boolean s_MQ135 = false;
+float tempCorrectValue = 0;
 
 
 char ssid[] = wlan_ssid;
 const char* password = wlan_pass;
 int sensorValue;
 float airPres, airTemperature, airHumidity, ppm, ppmbalanced, rzero;
-
+// dew point, etc
+// see https://www.wetterochs.de/wetter/feuchte.html
+float saturation_vapor_pressure_hPa, vapor_pressure_hPa, dew_point_celsius, absolute_humidity_g_per_m3;
+const float a = 7.5;
+const float b = 237.3;
+const float R = 8314.3;
+const float mw = 18.016;
+float v;
 
 ESP8266WebServer server(80);
 BME280I2C bme;
@@ -59,13 +67,15 @@ void handleNotFound(){
 }
 
 String promResponse() {
-  String promPage ="kraken_temperature_celsius{sensor=\"BME280\"} " + String(airTemperature) + "\n" ;
-  promPage += "kraken_airpressure_hectopascals{sensor=\"BME280\"} " + String(airPres) + "\n";
-  promPage += "kraken_relative_humidity_percent{sensor=\"BME280\"} " + String(airHumidity) + "\n";
-  promPage += "kraken_rzero{sensor=\"MQ135\"} " + String(rzero) + "\n";
-  promPage += "kraken_raw{sensor=\"MQ135\"} " + String(sensorValue) + "\n";
-  promPage += "kraken_voc_ppm{sensor=\"MQ135\"} " + String(ppm) + "\n";
-  promPage += "kraken_voc_ppm_balanced{sensor=\"MQ135\"} " + String(ppmbalanced) + "\n";
+  String promPage ="kraken_temperature_celsius{sensor_type=\"BME280\"} " + String(airTemperature) + "\n" ;
+  promPage += "kraken_airpressure_hectopascal{sensor_type=\"BME280\"} " + String(airPres) + "\n";
+  promPage += "kraken_relative_humidity_percent{sensor_type=\"BME280\"} " + String(airHumidity) + "\n";
+  promPage += "kraken_dew_point_celsius " + String(dew_point_celsius) + "\n";
+  promPage += "kraken_absolute_humidity_g_per_m3 " + String(absolute_humidity_g_per_m3) + "\n";
+  promPage += "kraken_rzero{sensor_type=\"MQ135\"} " + String(rzero) + "\n";
+  promPage += "kraken_raw{sensor_type=\"MQ135\"} " + String(sensorValue) + "\n";
+  promPage += "kraken_voc_ppm{sensor_type=\"MQ135\"} " + String(ppm) + "\n";
+  promPage += "kraken_voc_ppm_balanced{sensor_type=\"MQ135\"} " + String(ppmbalanced) + "\n";
   return promPage;
 }
 
@@ -107,19 +117,30 @@ void setup(void){
   });
 
   server.on("/metrics", [](){
-    Serial.println("\n[Client connected]");
+    String client_ip = server.client().remoteIP().toString();
+    Serial.println("Client connected from: " + client_ip);
 
-    // BME280 Abfrage
     bme.read(airPres, airTemperature, airHumidity);
-
-    // MQ 135 Abfrage
+    airTemperature = airTemperature - tempCorrectValue;
     sensorValue = analogRead(SENSORPIN);
     rzero = gasSensor.getRZero();
     ppm = gasSensor.getPPM();
     ppmbalanced = gasSensor.getCorrectedPPM(airTemperature, airHumidity);
 
+    // dew point, as per https://www.wetterochs.de/wetter/feuchte.html
+    saturation_vapor_pressure_hPa = 6.1078 * powf(10, ((a * airTemperature) / (b + airTemperature)));
+    vapor_pressure_hPa = (airHumidity / 100) * saturation_vapor_pressure_hPa;
+    v = log10(vapor_pressure_hPa/6.1078);
+    dew_point_celsius = b * v / (a - v);
+    //Serial.println("dew point: " + String(dew_point_celsius));
+
+    // absolute humidity
+    absolute_humidity_g_per_m3 = 100000 * mw / R  * vapor_pressure_hPa / (airTemperature + 273.15);
+    //Serial.println("abs humidity: " + String(absolute_humidity_g_per_m3));
+
     server.send(200, "text/plain", promResponse());
   });
+
 
   server.onNotFound(handleNotFound);
 
